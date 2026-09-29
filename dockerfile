@@ -6,6 +6,9 @@ COPY package*.json ./
 
 RUN npm install -g npm@latest && npm install
 
+COPY prisma ./prisma/
+RUN npx prisma generate
+
 COPY . .
 
 EXPOSE 3000
