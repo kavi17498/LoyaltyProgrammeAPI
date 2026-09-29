@@ -4,9 +4,9 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding initial database state...');
+  console.log('Initializing system settings...');
 
-  // 1. Seed System Settings
+  // 1. Initialize System Settings
   const settings = await prisma.systemSettings.upsert({
     where: { id: 'default' },
     update: {},
@@ -22,23 +22,35 @@ async function main() {
   });
   console.log('System settings initialized:', settings.id);
 
-  // 2. Seed initial ADMIN user if not present
-  const adminPasswordHash = await bcrypt.hash('Admin12345!', 12);
-  const adminPinHash = await bcrypt.hash('1234', 12);
+  // 2. Only seed admin if explicitly configured via environment variables
+  const initialUsername = process.env.ADMIN_INITIAL_USERNAME;
+  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
+  const initialPin = process.env.ADMIN_INITIAL_PIN;
 
-  const admin = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: {},
-    create: {
-      username: 'admin',
-      passwordHash: adminPasswordHash,
-      pinHash: adminPinHash,
-      role: 'ADMIN',
-      isActive: true,
-    },
-  });
+  if (initialUsername && initialPassword) {
+    const passwordHash = await bcrypt.hash(initialPassword, 12);
+    const pinHash = initialPin ? await bcrypt.hash(initialPin, 12) : null;
 
-  console.log(`Initial ADMIN user ready: ${admin.username} (ID: ${admin.id})`);
+    const admin = await prisma.user.upsert({
+      where: { username: initialUsername },
+      update: {
+        passwordHash,
+        pinHash,
+        role: 'ADMIN',
+        isActive: true,
+      },
+      create: {
+        username: initialUsername,
+        passwordHash,
+        pinHash,
+        role: 'ADMIN',
+        isActive: true,
+      },
+    });
+    console.log(`Initial ADMIN configured via environment: ${admin.username}`);
+  } else {
+    console.log('No hardcoded credentials. Use POST /auth/setup API to create initial administrator.');
+  }
 }
 
 main()

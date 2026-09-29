@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -10,6 +11,7 @@ import { UserEntity } from '../users/entities/user.entity.js';
 import { UsersService } from '../users/users.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { PinLoginDto } from './dto/pin-login.dto.js';
+import { SetupAdminDto } from './dto/setup-admin.dto.js';
 import { AuthResponseEntity } from './entities/auth-response.entity.js';
 
 @Injectable()
@@ -28,6 +30,46 @@ export class AuthService {
     };
 
     return this.jwtService.sign(payload);
+  }
+
+  async getSetupStatus(): Promise<{ isSetup: boolean }> {
+    const adminCount = await this.prisma.user.count({
+      where: { role: 'ADMIN', isActive: true },
+    });
+    return { isSetup: adminCount > 0 };
+  }
+
+  async setupAdmin(dto: SetupAdminDto): Promise<AuthResponseEntity> {
+    const adminCount = await this.prisma.user.count({
+      where: { role: 'ADMIN', isActive: true },
+    });
+
+    if (adminCount > 0) {
+      throw new ForbiddenException(
+        'System administrator is already configured. Please sign in via /auth/login',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const pinHash = dto.pin ? await bcrypt.hash(dto.pin, 12) : null;
+
+    const user = await this.prisma.user.create({
+      data: {
+        username: dto.username.trim(),
+        passwordHash,
+        pinHash,
+        role: 'ADMIN',
+        isActive: true,
+      },
+    });
+
+    const accessToken = this.generateToken(user);
+    const userEntity = await this.usersService.findOne(user.id);
+
+    return new AuthResponseEntity({
+      accessToken,
+      user: userEntity,
+    });
   }
 
   async login(dto: LoginDto): Promise<AuthResponseEntity> {

@@ -19,12 +19,37 @@ import { CurrentUser } from './decorators/current-user.decorator.js';
 import { Public } from './decorators/public.decorator.js';
 import { LoginDto } from './dto/login.dto.js';
 import { PinLoginDto } from './dto/pin-login.dto.js';
+import { SetupAdminDto } from './dto/setup-admin.dto.js';
 import { AuthResponseEntity } from './entities/auth-response.entity.js';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Public()
+  @Get('setup-status')
+  @ApiOperation({ summary: 'Check if an initial administrator account has been set up' })
+  @ApiResponse({ status: 200, description: 'Returns setup status' })
+  getSetupStatus(): Promise<{ isSetup: boolean }> {
+    return this.authService.getSetupStatus();
+  }
+
+  @Public()
+  @Post('setup')
+  @ApiOperation({
+    summary: 'Create initial administrator account via API (only available before first admin exists)',
+  })
+  @ApiBody({ type: SetupAdminDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Administrator account created successfully. Returns JWT access token',
+    type: AuthResponseEntity,
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden: Administrator already exists' })
+  setupAdmin(@Body() dto: SetupAdminDto): Promise<AuthResponseEntity> {
+    return this.authService.setupAdmin(dto);
+  }
 
   @Public()
   @Post('login')
