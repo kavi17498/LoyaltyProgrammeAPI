@@ -10,12 +10,75 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum TransactionType {
+  EARN
+  REDEEM
+  ADJUSTMENT
+  EXPIRE
+  REFUND
+}
+
+enum VerificationChannel {
+  SMS
+  EMAIL
+  WHATSAPP
+}
+
+enum VoucherStatus {
+  ACTIVE
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
+enum CampaignType {
+  BIRTHDAY
+  PROMOTIONAL
+  WINBACK
+  SEASONAL
+  WELCOME
+}
+
+enum Channel {
+  SMS
+  EMAIL
+  PUSH
+  WHATSAPP
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  CASHIER
+  STAFF
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
 model Customer {
-  id             String          @id @default(uuid())
-  phoneNumber    String          @unique
-  fullName       String
-  createdAt      DateTime        @default(now())
-  loyaltyAccount LoyaltyAccount?
+  id               String            @id @default(uuid())
+  fullName         String
+  email            String?           @unique
+  phoneNumber      String            @unique
+  birthdayMonth    Int?
+  birthdayDay      Int?
+  emailConsent     Boolean           @default(false)
+  smsConsent       Boolean           @default(false)
+  consentTimestamp DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  loyaltyAccount   LoyaltyAccount?
+  otpVerifications OTPVerification[]
+  raffleEntries    RaffleEntry[]
+  vouchers         Voucher[]
+  wonRaffles       Raffle[]          @relation("RaffleWinner")
 }
 
 model LoyaltyAccount {
@@ -23,5 +86,139 @@ model LoyaltyAccount {
   customerId     String          @unique
   customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
   currentBalance Int             @default(0)
+  status         String          @default("ACTIVE")
+  enrolledAt     DateTime        @default(now())
+  verifiedAt     DateTime?
   updatedAt      DateTime        @updatedAt
+
+  ledgers        LoyaltyLedger[]
+}
+
+model LoyaltyLedger {
+  id             String          @id @default(uuid())
+  accountId      String
+  loyaltyAccount LoyaltyAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type           TransactionType
+  pointsChange   Int
+  balanceAfter   Int
+  billAmount     Decimal?        @db.Decimal(10, 2)
+  billReference  String?
+  staffUserId    String?
+  staffUser      User?           @relation(fields: [staffUserId], references: [id], onDelete: SetNull)
+  deviceLocation String?
+  reason         String?
+  timestamp      DateTime        @default(now())
+}
+
+model OTPVerification {
+  id            String              @id @default(uuid())
+  customerId    String
+  customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  contactTarget String
+  channel       VerificationChannel
+  otpHash       String
+  expiresAt     DateTime
+  attemptCount  Int                 @default(0)
+  isVerified    Boolean             @default(false)
+  createdAt     DateTime            @default(now())
+}
+
+model Raffle {
+  id                  String        @id @default(uuid())
+  period              String
+  qualifyingThreshold Decimal       @db.Decimal(10, 2)
+  prizeValue          Decimal       @db.Decimal(10, 2)
+  isEnabled           Boolean       @default(true)
+  winnerCustomerId    String?
+  winnerCustomer      Customer?     @relation("RaffleWinner", fields: [winnerCustomerId], references: [id], onDelete: SetNull)
+  drawnAt             DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  entries             RaffleEntry[]
+}
+
+model RaffleEntry {
+  id            String    @id @default(uuid())
+  raffleId      String
+  raffle        Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  billReference String?
+  billAmount    Decimal   @db.Decimal(10, 2)
+  timestamp     DateTime  @default(now())
+  cashierUserId String?
+  cashierUser   User?     @relation(fields: [cashierUserId], references: [id], onDelete: SetNull)
+}
+
+model Voucher {
+  id             String              @id @default(uuid())
+  voucherCode    String              @unique
+  qrPayload      String
+  customerId     String
+  customer       Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  originalValue  Decimal             @db.Decimal(10, 2)
+  currentBalance Decimal             @db.Decimal(10, 2)
+  activationDate DateTime            @default(now())
+  expiryDate     DateTime
+  status         VoucherStatus       @default(ACTIVE)
+  source         String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  redemptions    VoucherRedemption[]
+}
+
+model VoucherRedemption {
+  id                String    @id @default(uuid())
+  voucherId         String
+  voucher           Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  amountRedeemed    Decimal   @db.Decimal(10, 2)
+  balanceAfter      Decimal   @db.Decimal(10, 2)
+  billReference     String?
+  cashierUserId     String?
+  cashierUser       User?     @relation("CashierRedemptions", fields: [cashierUserId], references: [id], onDelete: SetNull)
+  overrideManagerId String?
+  overrideManager   User?     @relation("ManagerOverrides", fields: [overrideManagerId], references: [id], onDelete: SetNull)
+  overrideReason    String?
+  timestamp         DateTime  @default(now())
+}
+
+model Campaign {
+  id              String       @id @default(uuid())
+  name            String
+  type            CampaignType
+  messageTemplate String
+  channel         Channel
+  schedule        String
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  username           String              @unique
+  passwordHash       String
+  pinHash            String?
+  role               UserRole            @default(CASHIER)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  ledgers            LoyaltyLedger[]
+  raffleEntries      RaffleEntry[]
+  cashierRedemptions VoucherRedemption[] @relation("CashierRedemptions")
+  managerOverrides   VoucherRedemption[] @relation("ManagerOverrides")
+}
+
+model SystemSettings {
+  id                         String   @id @default("default")
+  earnPointsPerDollar        Int      @default(1)
+  pointsRedeemPerDollar      Int      @default(100)
+  minRedeemThresholdPoints   Int      @default(500)
+  standardVoucherRedeemLimit Decimal  @default(50.00) @db.Decimal(10, 2)
+  defaultRaffleThreshold     Decimal  @default(25.00) @db.Decimal(10, 2)
+  defaultRafflePrize         Decimal  @default(100.00) @db.Decimal(10, 2)
+  updatedAt                  DateTime @updatedAt
 }

@@ -15,14 +15,23 @@ export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateCustomerDto): Promise<CustomerEntity> {
+    const hasConsent = dto.emailConsent || dto.smsConsent;
+
     try {
       const customer = await this.prisma.customer.create({
         data: {
-          phoneNumber: dto.phoneNumber.trim(),
           fullName: dto.fullName.trim(),
+          phoneNumber: dto.phoneNumber.trim(),
+          email: dto.email ? dto.email.trim().toLowerCase() : null,
+          birthdayMonth: dto.birthdayMonth ?? null,
+          birthdayDay: dto.birthdayDay ?? null,
+          emailConsent: dto.emailConsent ?? false,
+          smsConsent: dto.smsConsent ?? false,
+          consentTimestamp: hasConsent ? new Date() : null,
           loyaltyAccount: {
             create: {
               currentBalance: 0,
+              status: 'ACTIVE',
             },
           },
         },
@@ -34,6 +43,10 @@ export class CustomersService {
       return new CustomerEntity(customer);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes('email')) {
+          throw new ConflictException('A customer with this email already exists');
+        }
         throw new ConflictException('A customer with this phone number already exists');
       }
       throw new InternalServerErrorException('Failed to create customer');
@@ -72,12 +85,23 @@ export class CustomersService {
     // Verify customer exists before attempting update
     await this.findOne(id);
 
+    const hasConsentUpdate =
+      dto.emailConsent !== undefined || dto.smsConsent !== undefined;
+
     try {
       const updated = await this.prisma.customer.update({
         where: { id },
         data: {
           ...(dto.fullName !== undefined ? { fullName: dto.fullName.trim() } : {}),
           ...(dto.phoneNumber !== undefined ? { phoneNumber: dto.phoneNumber.trim() } : {}),
+          ...(dto.email !== undefined
+            ? { email: dto.email ? dto.email.trim().toLowerCase() : null }
+            : {}),
+          ...(dto.birthdayMonth !== undefined ? { birthdayMonth: dto.birthdayMonth } : {}),
+          ...(dto.birthdayDay !== undefined ? { birthdayDay: dto.birthdayDay } : {}),
+          ...(dto.emailConsent !== undefined ? { emailConsent: dto.emailConsent } : {}),
+          ...(dto.smsConsent !== undefined ? { smsConsent: dto.smsConsent } : {}),
+          ...(hasConsentUpdate ? { consentTimestamp: new Date() } : {}),
         },
         include: {
           loyaltyAccount: true,
@@ -87,6 +111,10 @@ export class CustomersService {
       return new CustomerEntity(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes('email')) {
+          throw new ConflictException('A customer with this email already exists');
+        }
         throw new ConflictException('A customer with this phone number already exists');
       }
       throw new InternalServerErrorException('Failed to update customer');
