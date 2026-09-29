@@ -19,7 +19,19 @@ async function bootstrap() {
     .setTitle('Loyalty Program API')
     .setDescription('Loyalty Program API Documentation')
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT access token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
     .build();
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 

@@ -11,6 +11,7 @@ import {
   Post,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
@@ -23,6 +24,7 @@ import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 import { CustomerEntity } from './entities/customer.entity.js';
 
 @ApiTags('Customers')
+@ApiBearerAuth('JWT-auth')
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
@@ -37,6 +39,7 @@ export class CustomersController {
     type: CustomerEntity,
   })
   @ApiResponse({ status: 400, description: 'Invalid input or validation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
   @ApiResponse({ status: 409, description: 'Phone number already registered' })
   create(@Body() createCustomerDto: CreateCustomerDto): Promise<CustomerEntity> {
     return this.customersService.create(createCustomerDto);
@@ -49,6 +52,7 @@ export class CustomersController {
     description: 'List of all customers with loyalty accounts',
     type: [CustomerEntity],
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
   findAll(): Promise<CustomerEntity[]> {
     return this.customersService.findAll();
   }
@@ -62,6 +66,7 @@ export class CustomersController {
     type: CustomerEntity,
   })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<CustomerEntity> {
     return this.customersService.findOne(id);
@@ -77,6 +82,7 @@ export class CustomersController {
     type: CustomerEntity,
   })
   @ApiResponse({ status: 400, description: 'Invalid input or UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   @ApiResponse({ status: 409, description: 'Phone number already registered to another customer' })
   update(
@@ -91,6 +97,7 @@ export class CustomersController {
   @ApiParam({ name: 'id', description: 'Customer UUID', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Customer deleted successfully' })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<{ message: string }> {
     return this.customersService.remove(id);
