@@ -11,30 +11,28 @@ import {
   Post,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
-import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Public } from '../auth/decorators/public.decorator.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserEntity } from './entities/user.entity.js';
 import { UsersService } from './users.service.js';
 
 @ApiTags('Users')
-@ApiBearerAuth('JWT-auth')
-@Roles(UserRole.ADMIN)
+// TEMPORARY: Publicly accessible without JWT auth or roles for testing CRUD
+@Public()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '[ADMIN Only] Create a new staff or manager user' })
+  @ApiOperation({ summary: 'Create a new user (Temporary: No auth required)' })
   @ApiBody({ type: CreateUserDto })
   @ApiResponse({
     status: 201,
@@ -42,28 +40,24 @@ export class UsersController {
     type: UserEntity,
   })
   @ApiResponse({ status: 400, description: 'Invalid input or validation failed' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - requires ADMIN role' })
   @ApiResponse({ status: 409, description: 'Username already taken' })
   create(@Body() createUserDto: CreateUserDto): Promise<UserEntity> {
     return this.usersService.create(createUserDto);
   }
 
   @Get()
-  @ApiOperation({ summary: '[ADMIN Only] Get all users' })
+  @ApiOperation({ summary: 'Get all users (Temporary: No auth required)' })
   @ApiResponse({
     status: 200,
     description: 'List of all system users',
     type: [UserEntity],
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - requires ADMIN role' })
   findAll(): Promise<UserEntity[]> {
     return this.usersService.findAll();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: '[ADMIN Only] Get user by ID' })
+  @ApiOperation({ summary: 'Get user by ID (Temporary: No auth required)' })
   @ApiParam({ name: 'id', description: 'User UUID', format: 'uuid' })
   @ApiResponse({
     status: 200,
@@ -71,15 +65,13 @@ export class UsersController {
     type: UserEntity,
   })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - requires ADMIN role' })
   @ApiResponse({ status: 404, description: 'User not found' })
   findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<UserEntity> {
     return this.usersService.findOne(id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: '[ADMIN Only] Update user credentials, role, or active status' })
+  @ApiOperation({ summary: 'Update user (Temporary: No auth required)' })
   @ApiParam({ name: 'id', description: 'User UUID', format: 'uuid' })
   @ApiBody({ type: UpdateUserDto })
   @ApiResponse({
@@ -88,8 +80,6 @@ export class UsersController {
     type: UserEntity,
   })
   @ApiResponse({ status: 400, description: 'Invalid input or UUID format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - requires ADMIN role' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 409, description: 'Username already taken' })
   update(
@@ -100,12 +90,10 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: '[ADMIN Only] Delete user by ID' })
+  @ApiOperation({ summary: 'Delete user by ID (Temporary: No auth required)' })
   @ApiParam({ name: 'id', description: 'User UUID', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 400, description: 'Invalid UUID format' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - requires ADMIN role' })
   @ApiResponse({ status: 404, description: 'User not found' })
   remove(@Param('id', new ParseUUIDPipe()) id: string): Promise<{ message: string }> {
     return this.usersService.remove(id);
