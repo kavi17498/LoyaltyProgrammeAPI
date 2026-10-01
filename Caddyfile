@@ -1,0 +1,10 @@
+{$DOMAIN::80} {
+    reverse_proxy api:3000
+
+    encode gzip zstd
+
+    log {
+        output stdout
+        format console
+    }
+}
